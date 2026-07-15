@@ -126,7 +126,14 @@ export default class HomePage {
   }
 
   // ===== State panel =====
+  #currentState = null;
+
   showState(name) {
+    // Jangan proses ulang (termasuk animasi fadeIn) bila state tidak berubah —
+    // mencegah panel hasil berkedip saat dipanggil berulang dari detection loop.
+    if (this.#currentState === name) return;
+    this.#currentState = name;
+
     const { stateIdle, stateLoading, stateResult } = this.elements;
     hideElement(stateIdle);
     hideElement(stateLoading);

@@ -27,6 +27,11 @@ export default class HomePresenter {
   #stableCount = 0;
   #generatedLabel = null;
 
+  // Penghalusan tampilan confidence (EMA) + pembatasan frekuensi update UI
+  // agar angka tidak melonjak-lonjak setiap frame.
+  #displayConfidence = null;
+  #lastUiUpdate = 0;
+
   constructor({ view, cameraService, detectionService, rootFactsService }) {
     this.#view = view;
     this.#camera = cameraService;
@@ -193,15 +198,31 @@ export default class HomePresenter {
     }
 
     // Stabilisasi: label valid sama harus muncul beberapa kali berturut-turut.
-    if (result.label === this.#stableLabel) {
+    const isSameLabel = result.label === this.#stableLabel;
+    if (isSameLabel) {
       this.#stableCount += 1;
+      // Exponential moving average: haluskan fluktuasi confidence antar frame.
+      this.#displayConfidence =
+        this.#displayConfidence === null
+          ? result.confidence
+          : this.#displayConfidence * 0.8 + result.confidence * 0.2;
     } else {
       this.#stableLabel = result.label;
       this.#stableCount = 1;
+      this.#displayConfidence = result.confidence;
     }
 
-    this.#view.showState("result");
-    this.#view.renderDetection(result);
+    // Batasi frekuensi pembaruan UI hasil (maks ~4x per detik) supaya angka
+    // kepercayaan tidak berkedip mengikuti setiap frame deteksi.
+    const now = performance.now();
+    if (!isSameLabel || now - this.#lastUiUpdate >= 250) {
+      this.#lastUiUpdate = now;
+      this.#view.showState("result");
+      this.#view.renderDetection({
+        ...result,
+        confidence: this.#displayConfidence,
+      });
+    }
 
     const isStable = this.#stableCount >= APP_CONFIG.detectionStabilityCount;
     if (isStable && this.#stableLabel !== this.#generatedLabel) {
@@ -286,6 +307,8 @@ export default class HomePresenter {
     this.#stableLabel = null;
     this.#stableCount = 0;
     this.#generatedLabel = null;
+    this.#displayConfidence = null;
+    this.#lastUiUpdate = 0;
   }
 
   destroy() {

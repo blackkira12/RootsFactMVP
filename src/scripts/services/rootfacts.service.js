@@ -32,15 +32,34 @@ class RootFactsService {
 
   // Coba muat pipeline dengan device+dtype tertentu.
   async #tryLoad(device, dtype, onProgress) {
+    // progress_callback Transformers.js melapor per-file (tokenizer, encoder,
+    // decoder, dst) — masing-masing 0-100% — sehingga angka tampak melompat.
+    // Agregasikan byte seluruh file dan jaga persentase tetap monoton naik.
+    const files = new Map();
+    let lastPercent = 0;
+
     return pipeline(this.config.task, this.config.model, {
       device,
       dtype,
       progress_callback: (data) => {
-        if (data.status === "progress" && data.progress != null) {
-          onProgress(
-            Math.round(data.progress),
-            `Memuat Text AI ${Math.round(data.progress)}%`,
-          );
+        if (data.status === "progress" && data.total) {
+          files.set(data.file, {
+            loaded: data.loaded || 0,
+            total: data.total,
+          });
+
+          let loaded = 0;
+          let total = 0;
+          for (const file of files.values()) {
+            loaded += file.loaded;
+            total += file.total;
+          }
+
+          const percent = Math.min(100, Math.round((loaded / total) * 100));
+          if (percent > lastPercent) {
+            lastPercent = percent;
+            onProgress(percent, `Memuat Text AI ${percent}%`);
+          }
         } else if (data.status === "ready") {
           onProgress(100, "Text AI siap");
         }
