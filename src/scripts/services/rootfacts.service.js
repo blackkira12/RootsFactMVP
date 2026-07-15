@@ -132,6 +132,8 @@ class RootFactsService {
     const persona = PERSONA_CONFIG[tone] || PERSONA_CONFIG.normal;
     return [
       `Write one short and accurate fun fact in Indonesian about the vegetable "${vegetable}".`,
+      `The fun fact must be specifically about "${vegetable}" and mention "${vegetable}" by name.`,
+      "Do not write about any other plant, fruit, or vegetable.",
       `Writing style: ${persona.instruction}`,
       "Use one or two concise sentences.",
       "Do not give medical advice.",
