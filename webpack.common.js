@@ -33,7 +33,12 @@ module.exports = {
     ],
     parser: {
       javascript: {
-        importMeta: true,
+        // Jangan biarkan webpack mengganti import.meta (dipakai internal
+        // @huggingface/transformers / onnxruntime-web). Bundle dimuat sebagai
+        // <script type="module"> sehingga import.meta valid secara native.
+        // importMeta: true menyebabkan "__webpack_module__ is not defined"
+        // pada production build.
+        importMeta: false,
       },
     },
   },
