@@ -29,7 +29,8 @@ export default class HomePresenter {
 
   // Penghalusan tampilan confidence (EMA) + pembatasan frekuensi update UI
   // agar angka tidak melonjak-lonjak setiap frame.
-  #displayConfidence = null;
+  #displayConfidence = 0;
+  #lastDisplayLabel = null;
   #lastUiUpdate = 0;
 
   constructor({ view, cameraService, detectionService, rootFactsService }) {
@@ -192,53 +193,58 @@ export default class HomePresenter {
   }
 
   #handleDetection(result) {
-    if (!isValidDetection(result)) {
-      // Confidence rendah — jangan reset hasil, cukup lewati.
-      return;
-    }
+    const now = performance.now();
 
-    // Stabilisasi: label valid sama harus muncul beberapa kali berturut-turut.
-    const isSameLabel = result.label === this.#stableLabel;
-    if (isSameLabel) {
-      this.#stableCount += 1;
-      // Exponential moving average: haluskan fluktuasi confidence antar frame.
+    // 1) Tampilan live: selalu tunjukkan tebakan teratas saat memindai, dengan
+    //    confidence dihaluskan (EMA) dan diperbarui maks ~4x/detik agar angka
+    //    tidak berkedip mengikuti setiap frame.
+    if (result.label === this.#lastDisplayLabel) {
       this.#displayConfidence =
-        this.#displayConfidence === null
-          ? result.confidence
-          : this.#displayConfidence * 0.8 + result.confidence * 0.2;
+        this.#displayConfidence * 0.7 + result.confidence * 0.3;
     } else {
-      this.#stableLabel = result.label;
-      this.#stableCount = 1;
+      this.#lastDisplayLabel = result.label;
       this.#displayConfidence = result.confidence;
     }
 
-    const isStable = this.#stableCount >= APP_CONFIG.detectionStabilityCount;
-
-    // Mode sekali jepret (seperti aplikasi referensi): setelah deteksi stabil,
-    // tampilkan hasil final, matikan kamera otomatis, lalu buat fun fact.
-    if (isStable && this.#stableLabel !== this.#generatedLabel) {
-      this.#generatedLabel = this.#stableLabel;
-      this.#view.showState("result");
-      this.#view.renderDetection({
-        ...result,
-        confidence: this.#displayConfidence,
-      });
-      this.#stopScan();
-      this.#view.setStatus("Sayuran terdeteksi", { active: true });
-      this.#generateFacts(this.#stableLabel);
-      return;
-    }
-
-    // Batasi frekuensi pembaruan UI hasil (maks ~4x per detik) supaya angka
-    // kepercayaan tidak berkedip mengikuti setiap frame deteksi.
-    const now = performance.now();
-    if (!isSameLabel || now - this.#lastUiUpdate >= 250) {
+    if (now - this.#lastUiUpdate >= 250) {
       this.#lastUiUpdate = now;
       this.#view.showState("result");
       this.#view.renderDetection({
         ...result,
         confidence: this.#displayConfidence,
       });
+    }
+
+    // 2) Streak "objek pasti": confidence tinggi (>= threshold) DAN margin
+    //    jelas dari kandidat kedua. Hanya frame yang benar-benar yakin dihitung.
+    const isConfident =
+      isValidDetection(result) &&
+      result.margin >= APP_CONFIG.detectionConfidenceMargin;
+
+    if (!isConfident) {
+      // Belum yakin — reset streak, jangan matikan kamera.
+      this.#stableLabel = null;
+      this.#stableCount = 0;
+      return;
+    }
+
+    if (result.label === this.#stableLabel) {
+      this.#stableCount += 1;
+    } else {
+      this.#stableLabel = result.label;
+      this.#stableCount = 1;
+    }
+
+    // 3) Auto-stop sekali jepret: kamera mati HANYA setelah objek terdeteksi
+    //    yakin sepanjang N frame berturut-turut. Lalu hasil final dibekukan
+    //    dan fun fact dibuat.
+    if (this.#stableCount >= APP_CONFIG.detectionStabilityCount) {
+      this.#generatedLabel = this.#stableLabel;
+      this.#view.showState("result");
+      this.#view.renderDetection(result);
+      this.#stopScan();
+      this.#view.setStatus("Sayuran terdeteksi", { active: true });
+      this.#generateFacts(this.#stableLabel);
     }
   }
 
@@ -331,7 +337,8 @@ export default class HomePresenter {
     this.#stableLabel = null;
     this.#stableCount = 0;
     this.#generatedLabel = null;
-    this.#displayConfidence = null;
+    this.#displayConfidence = 0;
+    this.#lastDisplayLabel = null;
     this.#lastUiUpdate = 0;
   }
 

@@ -22,20 +22,20 @@ Status: ✅ terverifikasi otomatis · 🟡 perlu uji manual (butuh kamera/perang
 
 ## KRITERIA 2 — Generative AI (Advanced)
 
-| Kriteria                            | Level    | Implementasi                           | File                            | Class/Function                       | Cara menguji                    | Status |
-| ----------------------------------- | -------- | -------------------------------------- | ------------------------------- | ------------------------------------ | ------------------------------- | ------ |
-| Label → prompt dinamis              | Basic    | label deteksi jadi input prompt        | `services/rootfacts.service.js` | `#buildPrompt`, `generateFacts`      | Deteksi berbeda → fakta berbeda | 🟡     |
-| Prompt bahasa Inggris               | Advanced | instruksi Inggris, output Indonesia    | `rootfacts.service.js`          | `#buildPrompt`                       | Tinjau kode                     | ✅     |
-| Transformers.js lokal (bukan cloud) | Advanced | pipeline `@huggingface/transformers`   | `rootfacts.service.js`          | `#tryLoad`                           | Tidak ada fetch API cloud       | ✅     |
-| Bukan teks statis                   | Advanced | tidak ada fun fact hard-coded          | `rootfacts.service.js`          | `generateFacts`                      | Grep: tidak ada array fakta     | ✅     |
-| Parameter generasi                  | Skilled  | temperature/top_p/do_sample            | `config.js`                     | `GENAI_CONFIG.generation`            | Tinjau kode                     | ✅     |
-| max_new_tokens ≤ 150                | Skilled  | 80 (di-clamp `Math.min(...,150)`)      | `rootfacts.service.js`          | `generateFacts`                      | Tinjau kode                     | ✅     |
-| dtype q4                            | Advanced | q4 + fallback q8                       | `rootfacts.service.js`          | `#load`                              | Tinjau kode                     | ✅     |
-| Copy to Clipboard                   | Advanced | writeText + fallback + feedback        | `home-presenter.js`             | `#onCopy`                            | Klik tombol salin               | 🟡     |
-| Persona dinamis (5)                 | Advanced | Normal/Lucu/Profesional/Sejarah/Santai | `config.js`, `templates.js`     | `PERSONA_CONFIG`                     | Ganti dropdown → gaya berbeda   | ✅/🟡  |
-| `navigator.gpu` check (GenAI)       | Advanced | cek sebelum device webgpu              | `rootfacts.service.js`          | `#load`, `isWebGPUSupported`         | —                               | ✅     |
-| WebGPU → WASM fallback              | Advanced | fallback valid Transformers.js         | `rootfacts.service.js`          | `#load`                              | Badge "Text AI: WebGPU/WASM"    | ✅     |
-| Sanitasi & whitelist label          | Skilled  | validasi vs metadata, batas panjang    | `rootfacts.service.js`          | `#sanitizeLabel`, `setAllowedLabels` | Tinjau kode                     | ✅     |
+| Kriteria                            | Level    | Implementasi                                    | File                            | Class/Function                       | Cara menguji                    | Status |
+| ----------------------------------- | -------- | ----------------------------------------------- | ------------------------------- | ------------------------------------ | ------------------------------- | ------ |
+| Label → prompt dinamis              | Basic    | label deteksi jadi input prompt                 | `services/rootfacts.service.js` | `#buildPrompt`, `generateFacts`      | Deteksi berbeda → fakta berbeda | 🟡     |
+| Prompt bahasa Inggris               | Advanced | instruksi & output Inggris (opsional Indonesia) | `rootfacts.service.js`          | `#buildPrompt`                       | Tinjau kode                     | ✅     |
+| Transformers.js lokal (bukan cloud) | Advanced | pipeline `@huggingface/transformers`            | `rootfacts.service.js`          | `#tryLoad`                           | Tidak ada fetch API cloud       | ✅     |
+| Bukan teks statis                   | Advanced | tidak ada fun fact hard-coded                   | `rootfacts.service.js`          | `generateFacts`                      | Grep: tidak ada array fakta     | ✅     |
+| Parameter generasi                  | Skilled  | temperature/top_p/do_sample                     | `config.js`                     | `GENAI_CONFIG.generation`            | Tinjau kode                     | ✅     |
+| max_new_tokens ≤ 150                | Skilled  | 100 (di-clamp `Math.min(...,150)`)              | `rootfacts.service.js`          | `generateFacts`                      | Tinjau kode                     | ✅     |
+| dtype q4                            | Advanced | q4 + fallback q8                                | `rootfacts.service.js`          | `#load`                              | Tinjau kode                     | ✅     |
+| Copy to Clipboard                   | Advanced | writeText + fallback + feedback                 | `home-presenter.js`             | `#onCopy`                            | Klik tombol salin               | 🟡     |
+| Persona dinamis (5)                 | Advanced | Normal/Lucu/Profesional/Sejarah/Santai          | `config.js`, `templates.js`     | `PERSONA_CONFIG`                     | Ganti dropdown → gaya berbeda   | ✅/🟡  |
+| `navigator.gpu` check (GenAI)       | Advanced | cek sebelum device webgpu                       | `rootfacts.service.js`          | `#load`, `isWebGPUSupported`         | —                               | ✅     |
+| WebGPU → WASM fallback              | Advanced | fallback valid Transformers.js                  | `rootfacts.service.js`          | `#load`                              | Badge "Text AI: WebGPU/WASM"    | ✅     |
+| Sanitasi & whitelist label          | Skilled  | validasi vs metadata, batas panjang             | `rootfacts.service.js`          | `#sanitizeLabel`, `setAllowedLabels` | Tinjau kode                     | ✅     |
 
 ## KRITERIA 3 — PWA / Offline / Lint / Netlify (Advanced)
 

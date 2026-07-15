@@ -34,7 +34,11 @@ src/scripts/
 
 - **CV**: 18 label sayuran, imageSize 224, normalisasi `(x / 127.5) - 1`. Model,
   bobot, dan urutan label **tidak diubah**.
-- **GenAI**: `dtype: "q4"` bila didukung (fallback q8), `max_new_tokens: 80`.
+- **GenAI**: `dtype: "q4"` (fallback q8), `max_new_tokens: 100` (≤150),
+  `do_sample: true`, `temperature: 0.7`, `top_p: 0.9`, plus `no_repeat_ngram_size: 3`
+  & `repetition_penalty: 1.4` untuk mencegah pengulangan. Output bahasa Inggris
+  (model LaMini-Flan-T5 paling akurat di bahasa Inggris; output Indonesia hanya
+  opsional pada rubrik).
 
 ## Backend Adaptif
 

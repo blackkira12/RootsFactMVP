@@ -150,11 +150,12 @@ class RootFactsService {
   #buildPrompt(vegetable, tone) {
     const persona = PERSONA_CONFIG[tone] || PERSONA_CONFIG.normal;
     return [
-      `Write one short and accurate fun fact in Indonesian about the vegetable "${vegetable}".`,
+      `Write one interesting and accurate fun fact about the vegetable "${vegetable}".`,
       `The fun fact must be specifically about "${vegetable}" and mention "${vegetable}" by name.`,
       "Do not write about any other plant, fruit, or vegetable.",
       `Writing style: ${persona.instruction}`,
       "Use one or two concise sentences.",
+      "Do not repeat words or phrases.",
       "Do not give medical advice.",
       "Do not invent numerical statistics.",
       "Do not include a heading.",
@@ -194,10 +195,12 @@ class RootFactsService {
       const { generation } = this.config;
       const output = await this.generator(prompt, {
         max_new_tokens: Math.min(generation.max_new_tokens, 150),
+        min_new_tokens: generation.min_new_tokens,
         temperature: generation.temperature,
         top_p: generation.top_p,
         do_sample: generation.do_sample,
         repetition_penalty: generation.repetition_penalty,
+        no_repeat_ngram_size: generation.no_repeat_ngram_size,
       });
 
       const raw = Array.isArray(output)

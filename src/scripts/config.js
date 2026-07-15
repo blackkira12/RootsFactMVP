@@ -1,11 +1,15 @@
 const APP_CONFIG = {
-  detectionConfidenceThreshold: 70,
+  // Threshold ketat: objek baru dianggap "pasti" bila confidence >= 90%.
+  detectionConfidenceThreshold: 90,
   analyzingDelay: 2000,
   factsGenerationDelay: 2000,
   detectionRetryInterval: 100,
-  // Berapa kali label valid yang sama harus muncul berturut-turut sebelum
-  // dianggap stabil dan memicu generasi fun fact (mencegah generate tiap frame).
-  detectionStabilityCount: 3,
+  // Label valid & yakin yang sama harus muncul 5 frame berturut-turut sebelum
+  // kamera auto-stop (mencegah salah picu / kamera mati terlalu mudah).
+  detectionStabilityCount: 5,
+  // Selisih minimum antara kandidat teratas dan kedua (%). Memastikan model
+  // benar-benar yakin pada satu objek, bukan menebak di antara dua yang mirip.
+  detectionConfidenceMargin: 25,
 };
 
 const UI_CONFIG = {
@@ -54,11 +58,13 @@ const GENAI_CONFIG = {
   task: "text2text-generation",
   dtype: "q4",
   generation: {
-    max_new_tokens: 80, // wajib <= 150
-    temperature: 0.8,
+    max_new_tokens: 100, // wajib <= 150
+    min_new_tokens: 24, // cegah output terlalu pendek
+    temperature: 0.7,
     top_p: 0.9,
     do_sample: true,
-    repetition_penalty: 1.3,
+    repetition_penalty: 1.4,
+    no_repeat_ngram_size: 3, // cegah pengulangan frasa ("grow and grow ...")
   },
 };
 

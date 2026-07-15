@@ -166,12 +166,16 @@ class DetectionService {
       .sort((a, b) => b.confidenceRaw - a.confidenceRaw);
 
     const top = predictions[0];
+    const second = predictions[1];
+    // Margin = seberapa jauh kandidat teratas mengungguli kandidat kedua.
+    const margin = second ? top.confidence - second.confidence : top.confidence;
     const isValid = top.confidence >= APP_CONFIG.detectionConfidenceThreshold;
 
     return {
       label: top.label,
       confidence: top.confidence,
       confidenceRaw: top.confidenceRaw,
+      margin,
       isValid,
       backend: this.currentBackend,
       inferenceTime,
