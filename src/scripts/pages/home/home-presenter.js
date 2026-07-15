@@ -25,6 +25,7 @@ export default class HomePresenter {
   // Stabilisasi hasil deteksi.
   #stableLabel = null;
   #stableCount = 0;
+  #confidentSince = 0; // timestamp mulai streak yakin (untuk dwell berbasis waktu)
   #generatedLabel = null;
 
   // Penghalusan tampilan confidence (EMA) + pembatasan frekuensi update UI
@@ -133,6 +134,8 @@ export default class HomePresenter {
 
     this.#isScanning = true;
     this.#resetStabilization();
+    // Sesi scan baru → fakta dasar segar (bukan cache sesi sebelumnya).
+    this.#rootFacts.resetContext();
     this.#view.setScanning(true);
     this.#view.setStatus("Memindai", { active: true });
     this.#view.showState("loading");
@@ -225,20 +228,28 @@ export default class HomePresenter {
       // Belum yakin — reset streak, jangan matikan kamera.
       this.#stableLabel = null;
       this.#stableCount = 0;
+      this.#confidentSince = 0;
       return;
     }
 
     if (result.label === this.#stableLabel) {
       this.#stableCount += 1;
     } else {
+      // Label yakin baru — mulai hitung durasi dwell dari sekarang.
       this.#stableLabel = result.label;
       this.#stableCount = 1;
+      this.#confidentSince = now;
     }
 
     // 3) Auto-stop sekali jepret: kamera mati HANYA setelah objek terdeteksi
-    //    yakin sepanjang N frame berturut-turut. Lalu hasil final dibekukan
-    //    dan fun fact dibuat.
-    if (this.#stableCount >= APP_CONFIG.detectionStabilityCount) {
+    //    yakin & stabil selama durasi dwell (~2 detik), dengan gerbang minimal
+    //    frame anti-fluke. Lalu hasil final dibekukan dan fun fact dibuat.
+    const heldLongEnough =
+      now - this.#confidentSince >= APP_CONFIG.detectionHoldMs;
+    const enoughFrames =
+      this.#stableCount >= APP_CONFIG.detectionStabilityCount;
+
+    if (heldLongEnough && enoughFrames) {
       this.#generatedLabel = this.#stableLabel;
       this.#view.showState("result");
       this.#view.renderDetection(result);
@@ -336,6 +347,7 @@ export default class HomePresenter {
   #resetStabilization() {
     this.#stableLabel = null;
     this.#stableCount = 0;
+    this.#confidentSince = 0;
     this.#generatedLabel = null;
     this.#displayConfidence = 0;
     this.#lastDisplayLabel = null;

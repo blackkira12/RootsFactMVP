@@ -4,9 +4,12 @@ const APP_CONFIG = {
   analyzingDelay: 2000,
   factsGenerationDelay: 2000,
   detectionRetryInterval: 100,
-  // Label valid & yakin yang sama harus muncul 5 frame berturut-turut sebelum
-  // kamera auto-stop (mencegah salah picu / kamera mati terlalu mudah).
-  detectionStabilityCount: 5,
+  // Objek harus terdeteksi yakin & stabil (label sama) selama durasi ini
+  // sebelum kamera auto-stop. Basis WAKTU, bukan jumlah frame, agar tidak
+  // "langsung mati" (5 frame @30fps hanya ~0,17 detik).
+  detectionHoldMs: 2000,
+  // Minimal frame berturut-turut sebagai gerbang tambahan (anti-fluke).
+  detectionStabilityCount: 3,
   // Selisih minimum antara kandidat teratas dan kedua (%). Memastikan model
   // benar-benar yakin pada satu objek, bukan menebak di antara dua yang mirip.
   detectionConfidenceMargin: 25,
@@ -48,23 +51,42 @@ const DETECTION_CONFIG = {
   imageSize: 224,
   // Teachable Machine menormalkan pixel ke rentang [-1, 1] => (x / 127.5) - 1.
   normalization: { offset: 127.5, shift: -1 },
+  // Crop input hanya ke area kotak hijau (overlay-frame `inset: 18%` di CSS).
+  // Model MobileNet menilai seluruh gambar, jadi dengan meng-crop ke tengah,
+  // deteksi hanya bereaksi pada objek yang berada di dalam kotak hijau.
+  cropInset: 0.18,
 };
 
 // Konfigurasi Generative AI (Transformers.js).
 // Model LaMini-Flan-T5 sesuai materi pelatihan (text2text-generation).
 // dtype "q4" dipakai bila tersedia; RootFactsService melakukan fallback otomatis.
 const GENAI_CONFIG = {
-  model: "Xenova/LaMini-Flan-T5-248M",
+  // 783M untuk akurasi faktual lebih baik (LaMini-Flan-T5).
+  model: "Xenova/LaMini-Flan-T5-783M",
   task: "text2text-generation",
   dtype: "q4",
+  // Generasi dua tahap agar akurat & konsisten antar persona:
+  //  - base: fakta inti, randomness rendah (temperature 0.3) = lebih faktual.
+  //  - style: menuliskan ulang fakta base sesuai persona (tanpa mengubah fakta).
   generation: {
-    max_new_tokens: 100, // wajib <= 150
-    min_new_tokens: 24, // cegah output terlalu pendek
-    temperature: 0.7,
-    top_p: 0.9,
-    do_sample: true,
-    repetition_penalty: 1.4,
-    no_repeat_ngram_size: 3, // cegah pengulangan frasa ("grow and grow ...")
+    base: {
+      max_new_tokens: 80, // wajib <= 150
+      min_new_tokens: 20,
+      temperature: 0.3,
+      top_p: 0.9,
+      do_sample: true,
+      repetition_penalty: 1.4,
+      no_repeat_ngram_size: 3,
+    },
+    style: {
+      max_new_tokens: 100, // wajib <= 150
+      min_new_tokens: 20,
+      temperature: 0.7,
+      top_p: 0.9,
+      do_sample: true,
+      repetition_penalty: 1.4,
+      no_repeat_ngram_size: 3,
+    },
   },
 };
 

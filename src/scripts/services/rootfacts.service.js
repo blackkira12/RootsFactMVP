@@ -21,6 +21,16 @@ class RootFactsService {
     this.loadingPromise = null;
     // Whitelist label — diisi dari metadata.json model CV oleh presenter.
     this.allowedLabels = new Set();
+    // Cache fakta dasar per sesi deteksi agar konsisten saat ganti persona.
+    this.baseVegetable = null;
+    this.baseFact = null;
+  }
+
+  // Reset konteks fakta dasar (dipanggil presenter saat mulai scan baru)
+  // sehingga setiap sesi menghasilkan fakta dasar segar.
+  resetContext() {
+    this.baseVegetable = null;
+    this.baseFact = null;
   }
 
   // Whitelist label valid berdasarkan metadata.json (mencegah prompt injection).
@@ -146,34 +156,66 @@ class RootFactsService {
     return cleaned;
   }
 
-  // Bangun prompt dinamis (bahasa Inggris) berdasarkan label + persona.
-  #buildPrompt(vegetable, tone) {
-    const persona = PERSONA_CONFIG[tone] || PERSONA_CONFIG.normal;
+  // Tahap 1 — prompt fakta dasar: faktual & akurat (bahasa Inggris).
+  #buildBasePrompt(vegetable) {
     return [
-      `Write one interesting and accurate fun fact about the vegetable "${vegetable}".`,
-      `The fun fact must be specifically about "${vegetable}" and mention "${vegetable}" by name.`,
+      `Write one short, accurate, and factual fun fact about the vegetable "${vegetable}".`,
+      `State only well-known, true information about "${vegetable}".`,
       "Do not write about any other plant, fruit, or vegetable.",
-      `Writing style: ${persona.instruction}`,
-      "Use one or two concise sentences.",
-      "Do not repeat words or phrases.",
-      "Do not give medical advice.",
-      "Do not invent numerical statistics.",
-      "Do not include a heading.",
-      "Return only the fun fact.",
+      "Do not invent statistics. Do not give medical advice.",
+      "Use one or two concise sentences. Do not repeat words or phrases.",
+      "Return only the fact.",
     ].join("\n");
   }
 
-  // Bersihkan output dari token khusus, prompt yang terulang, & baris kosong.
+  // Tahap 2 — prompt restyle: menulis ulang fakta dasar sesuai persona
+  // TANPA mengubah fakta (menjaga konsistensi & akurasi antar persona).
+  #buildStylePrompt(vegetable, tone, baseFact) {
+    const persona = PERSONA_CONFIG[tone] || PERSONA_CONFIG.normal;
+    return [
+      `Rewrite the following fun fact about "${vegetable}" in this writing style: ${persona.instruction}`,
+      "Keep the facts exactly the same and accurate. Do not add new facts.",
+      "Do not repeat words or phrases. Use one or two concise sentences.",
+      `Fun fact: "${baseFact}"`,
+      "Return only the rewritten fun fact.",
+    ].join("\n");
+  }
+
+  // Bersihkan output dari token khusus, label meta, & baris kosong.
   #cleanOutput(text) {
-    return text
-      .replace(/<\/?s>|<pad>|<\/?unk>/gi, "")
-      .replace(/^\s*(fun fact|fakta)\s*[:-]/i, "")
-      .replace(/\n{2,}/g, "\n")
-      .trim()
-      .slice(0, 400);
+    return (
+      text
+        .replace(/<\/?s>|<pad>|<\/?unk>/gi, "")
+        // Buang label meta yang kadang bocor dari instruksi restyle.
+        .replace(/(-\s*)?(rewritten\s+)?fun\s*fact\s*[:-]\s*/gi, "")
+        .replace(/^\s*fakta\s*[:-]\s*/i, "")
+        .replace(/^["']|["']$/g, "")
+        .replace(/\n{2,}/g, "\n")
+        .trim()
+        .slice(0, 400)
+    );
+  }
+
+  // Jalankan pipeline sekali dengan parameter tertentu, kembalikan teks bersih.
+  async #run(prompt, params) {
+    const output = await this.generator(prompt, {
+      max_new_tokens: Math.min(params.max_new_tokens, 150),
+      min_new_tokens: params.min_new_tokens,
+      temperature: params.temperature,
+      top_p: params.top_p,
+      do_sample: params.do_sample,
+      repetition_penalty: params.repetition_penalty,
+      no_repeat_ngram_size: params.no_repeat_ngram_size,
+    });
+    const raw = Array.isArray(output)
+      ? output[0]?.generated_text
+      : output?.generated_text;
+    return this.#cleanOutput(raw || "");
   }
 
   // [Basic/Skilled/Advance] Hasilkan fun fact untuk label + tone.
+  // Dua tahap: (1) fakta dasar akurat (di-cache per sesi), (2) restyle sesuai
+  // persona — fakta inti tetap konsisten saat persona diganti.
   async generateFacts(vegetable, tone = this.currentTone) {
     if (!this.isReady()) {
       throw new Error("Model Generative AI belum siap.");
@@ -188,30 +230,35 @@ class RootFactsService {
       throw new Error(`Label tidak valid atau di luar daftar: "${vegetable}".`);
     }
 
-    const prompt = this.#buildPrompt(safeLabel, tone);
+    const { base, style } = this.config.generation;
     this.isGenerating = true;
 
     try {
-      const { generation } = this.config;
-      const output = await this.generator(prompt, {
-        max_new_tokens: Math.min(generation.max_new_tokens, 150),
-        min_new_tokens: generation.min_new_tokens,
-        temperature: generation.temperature,
-        top_p: generation.top_p,
-        do_sample: generation.do_sample,
-        repetition_penalty: generation.repetition_penalty,
-        no_repeat_ngram_size: generation.no_repeat_ngram_size,
-      });
-
-      const raw = Array.isArray(output)
-        ? output[0]?.generated_text
-        : output?.generated_text;
-
-      const cleaned = this.#cleanOutput(raw || "");
-      if (!cleaned) {
-        throw new Error("Model tidak menghasilkan teks.");
+      // Tahap 1: fakta dasar (sekali per sayuran, lalu di-cache).
+      if (this.baseVegetable !== safeLabel || !this.baseFact) {
+        const baseFact = await this.#run(
+          this.#buildBasePrompt(safeLabel),
+          base,
+        );
+        if (!baseFact) {
+          throw new Error("Model tidak menghasilkan fakta dasar.");
+        }
+        this.baseVegetable = safeLabel;
+        this.baseFact = baseFact;
       }
-      return cleaned;
+
+      // Persona "normal" memakai fakta dasar apa adanya (paling netral).
+      if (tone === "normal") {
+        return this.baseFact;
+      }
+
+      // Tahap 2: restyle fakta dasar sesuai persona.
+      const styled = await this.#run(
+        this.#buildStylePrompt(safeLabel, tone, this.baseFact),
+        style,
+      );
+      // Fallback aman: bila restyle gagal/kosong, pakai fakta dasar.
+      return styled || this.baseFact;
     } finally {
       this.isGenerating = false;
     }

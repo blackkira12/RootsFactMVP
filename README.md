@@ -30,15 +30,23 @@ src/scripts/
 | Peran           | Model                                      | Sumber                  |
 | --------------- | ------------------------------------------ | ----------------------- |
 | Computer Vision | Teachable Machine MobileNet (`model.json`) | Lokal (`src/model`)     |
-| Generative AI   | `Xenova/LaMini-Flan-T5-248M` (text2text)   | Hugging Face (di-cache) |
+| Generative AI   | `Xenova/LaMini-Flan-T5-783M` (text2text)   | Hugging Face (di-cache) |
 
 - **CV**: 18 label sayuran, imageSize 224, normalisasi `(x / 127.5) - 1`. Model,
   bobot, dan urutan label **tidak diubah**.
-- **GenAI**: `dtype: "q4"` (fallback q8), `max_new_tokens: 100` (≤150),
-  `do_sample: true`, `temperature: 0.7`, `top_p: 0.9`, plus `no_repeat_ngram_size: 3`
-  & `repetition_penalty: 1.4` untuk mencegah pengulangan. Output bahasa Inggris
-  (model LaMini-Flan-T5 paling akurat di bahasa Inggris; output Indonesia hanya
-  opsional pada rubrik).
+- **GenAI**: `dtype: "q4"` (fallback q8). Output bahasa Inggris (model
+  LaMini-Flan-T5 paling akurat di Inggris; Indonesia opsional pada rubrik).
+  Generasi **dua tahap** demi akurasi & konsistensi antar persona:
+  1. **Fakta dasar** — `temperature 0.3`, faktual, di-cache per sesi deteksi.
+  2. **Restyle** — menulis ulang fakta dasar sesuai persona tanpa mengubah
+     faktanya (`temperature 0.7`). Ganti persona hanya menjalankan tahap 2.
+
+  Semua tahap: `do_sample: true`, `top_p: 0.9`, `no_repeat_ngram_size: 3`,
+  `repetition_penalty: 1.4`, `max_new_tokens ≤ 150`.
+
+- **Deteksi**: hanya area **kotak hijau** yang diklasifikasi (crop `inset 18%`).
+  Kamera **auto-stop** hanya bila objek terdeteksi yakin (≥90% + margin ≥25%)
+  dan stabil **~2 detik** (dwell berbasis waktu), lalu fun fact dibuat.
 
 ## Backend Adaptif
 

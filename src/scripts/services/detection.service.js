@@ -118,10 +118,20 @@ class DetectionService {
   // Preprocessing sesuai model Teachable Machine MobileNet.
   // Dijalankan di dalam tf.tidy agar seluruh tensor antara otomatis dibersihkan.
   #preprocess(imageElement) {
-    const { imageSize, normalization } = this.config;
+    const { imageSize, normalization, cropInset } = this.config;
     return tf.tidy(() => {
       const pixels = tf.browser.fromPixels(imageElement);
-      const resized = tf.image.resizeBilinear(pixels, [imageSize, imageSize]);
+
+      // Crop ke area kotak hijau (bagian tengah frame). Sesuai overlay-frame
+      // `inset: 18%` sehingga hanya objek di dalam kotak yang diklasifikasi.
+      const [height, width] = pixels.shape;
+      const y0 = Math.round(height * cropInset);
+      const x0 = Math.round(width * cropInset);
+      const cropH = Math.round(height * (1 - 2 * cropInset));
+      const cropW = Math.round(width * (1 - 2 * cropInset));
+      const cropped = pixels.slice([y0, x0, 0], [cropH, cropW, 3]);
+
+      const resized = tf.image.resizeBilinear(cropped, [imageSize, imageSize]);
       const normalized = resized
         .toFloat()
         .div(normalization.offset)
