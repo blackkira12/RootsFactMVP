@@ -1,10 +1,1 @@
-# Isi APP_URL dengan URL Netlify ASLI setelah deploy (WAJIB sebelum submit).
-# Contoh: APP_URL=https://rootfacts-baasith.netlify.app
-#
-# Cara deploy cepat:
-#   1) npm run build
-#   2) Netlify: New site -> import repo (build: npm run build, publish: dist)
-#      atau drag-and-drop folder dist/ ke https://app.netlify.com/drop
-#   3) Salin URL hasil deploy ke baris APP_URL di bawah.
-
-APP_URL=
+APP_URL=https://rootsfactadvance.netlify.app
