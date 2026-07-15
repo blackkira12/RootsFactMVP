@@ -212,6 +212,23 @@ export default class HomePresenter {
       this.#displayConfidence = result.confidence;
     }
 
+    const isStable = this.#stableCount >= APP_CONFIG.detectionStabilityCount;
+
+    // Mode sekali jepret (seperti aplikasi referensi): setelah deteksi stabil,
+    // tampilkan hasil final, matikan kamera otomatis, lalu buat fun fact.
+    if (isStable && this.#stableLabel !== this.#generatedLabel) {
+      this.#generatedLabel = this.#stableLabel;
+      this.#view.showState("result");
+      this.#view.renderDetection({
+        ...result,
+        confidence: this.#displayConfidence,
+      });
+      this.#stopScan();
+      this.#view.setStatus("Sayuran terdeteksi", { active: true });
+      this.#generateFacts(this.#stableLabel);
+      return;
+    }
+
     // Batasi frekuensi pembaruan UI hasil (maks ~4x per detik) supaya angka
     // kepercayaan tidak berkedip mengikuti setiap frame deteksi.
     const now = performance.now();
@@ -223,30 +240,37 @@ export default class HomePresenter {
         confidence: this.#displayConfidence,
       });
     }
-
-    const isStable = this.#stableCount >= APP_CONFIG.detectionStabilityCount;
-    if (isStable && this.#stableLabel !== this.#generatedLabel) {
-      this.#generatedLabel = this.#stableLabel;
-      this.#generateFacts(this.#stableLabel);
-    }
   }
 
   async #generateFacts(label) {
     if (this.#rootFacts.isGenerating) return;
 
+    this.#view.hideFactError();
+
+    // Tunggu Text AI siap bila masih dimuat (loadModel bersifat singleton,
+    // langsung kembali bila sudah selesai).
     if (!this.#rootFacts.isReady()) {
       this.#view.setFactLoading(true, "Menyiapkan Text AI...");
-      return;
+      try {
+        await this.#rootFacts.loadModel();
+      } catch (error) {
+        logError("Text AI gagal dimuat", error);
+        this.#view.setFactLoading(false);
+        this.#view.showFactError("Text AI gagal dimuat.");
+        return;
+      }
     }
 
-    this.#view.hideFactError();
-    this.#view.setFactLoading(true);
+    this.#view.setFactLoading(true, "Memuat fakta menarik...");
+    this.#view.setStatus("Membuat fun fact", { active: true });
     try {
       const fact = await this.#rootFacts.generateFacts(label);
       this.#view.setFact(fact);
+      this.#view.setStatus("Siap", { active: false });
     } catch (error) {
       logError("Gagal membuat fun fact", error);
       this.#view.showFactError("Gagal membuat fakta.");
+      this.#view.setStatus("Siap", { active: false });
     } finally {
       this.#view.setFactLoading(false);
     }

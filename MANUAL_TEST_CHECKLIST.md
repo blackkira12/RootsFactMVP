@@ -21,7 +21,10 @@ npm run serve      # buka http://localhost:8080 (Chrome/Edge terbaru untuk WebGP
 - [ ] Dropdown kamera terisi perangkat; ganti kamera → stream berganti.
 - [ ] Geser slider FPS (15/30/45/60) → label FPS berubah & laju deteksi menyesuaikan.
 - [ ] Arahkan ke sayuran → label + confidence (%) tampil dan bar terisi.
-- [ ] Klik scan lagi → kamera berhenti, kembali ke idle.
+- [ ] Setelah deteksi stabil: kamera **otomatis berhenti** (mode sekali jepret),
+      hasil + confidence tetap tampil, lalu fun fact dibuat.
+- [ ] Klik tombol scan saat memindai → kamera berhenti manual.
+- [ ] Klik scan lagi → sesi pemindaian baru dimulai (fakta baru dibuat).
 
 ## B. Backend & Memori
 
