@@ -72,55 +72,58 @@ const GENAI_CONFIG = {
   model: "Xenova/LaMini-Flan-T5-783M",
   task: "text2text-generation",
   dtype: "q4",
-  // Generasi dua tahap agar akurat & konsisten antar persona:
-  //  - base: fakta inti, randomness rendah (temperature 0.3) = lebih faktual.
-  //  - style: menuliskan ulang fakta base sesuai persona (tanpa mengubah fakta).
+  // Parameter generasi umum. temperature & top_p ditimpa per persona agar gaya
+  // benar-benar berbeda (Lucu lebih kreatif, Profesional lebih terkendali).
   generation: {
-    base: {
-      max_new_tokens: 80, // wajib <= 150
-      min_new_tokens: 20,
-      temperature: 0.3,
-      top_p: 0.9,
-      do_sample: true,
-      repetition_penalty: 1.4,
-      no_repeat_ngram_size: 3,
-    },
-    style: {
-      max_new_tokens: 100, // wajib <= 150
-      min_new_tokens: 20,
-      temperature: 0.7,
-      top_p: 0.9,
-      do_sample: true,
-      repetition_penalty: 1.4,
-      no_repeat_ngram_size: 3,
-    },
+    max_new_tokens: 100, // wajib <= 150
+    min_new_tokens: 18,
+    do_sample: true,
+    repetition_penalty: 1.4,
+    no_repeat_ngram_size: 3,
   },
 };
 
-// Persona / gaya penulisan dinamis. `instruction` selalu berbahasa Inggris
-// (prompt Generative AI wajib bahasa Inggris), output tetap diminta bahasa Indonesia.
+// Persona / gaya penulisan dinamis (prompt wajib bahasa Inggris).
+// `lead` = kalimat pembuka prompt yang menegaskan gaya; %V% diganti nama sayuran.
+// `focus` = penekanan tambahan opsional. temperature/top_p disesuaikan per gaya
+// agar output setiap persona jelas berbeda. Seluruh teks tetap dari model AI.
 const PERSONA_CONFIG = {
   normal: {
     label: "Normal",
-    instruction: "Neutral, informative, and concise.",
+    lead: 'Write one interesting and accurate fun fact about the vegetable "%V%".',
+    focus: "Keep it neutral, clear, and informative.",
+    temperature: 0.5,
+    top_p: 0.9,
   },
   funny: {
     label: "Lucu",
-    instruction:
-      "Playful, light, and family-friendly, without offensive jokes.",
+    lead: 'Write one funny and playful fun fact about the vegetable "%V%".',
+    focus:
+      "Make it humorous and light-hearted, like a witty joke, with a cheerful comedic tone. Keep it family-friendly.",
+    temperature: 0.95,
+    top_p: 0.95,
   },
   professional: {
     label: "Profesional",
-    instruction: "Formal, factual, and concise.",
+    lead: 'Write one fun fact about the vegetable "%V%" in a formal, professional, scientific tone.',
+    focus:
+      "Use precise and technical language, as if written for an encyclopedia.",
+    temperature: 0.3,
+    top_p: 0.9,
   },
   history: {
     label: "Sejarah",
-    instruction:
-      "Focus on culinary history, origin, or traditional use. Avoid unsupported claims.",
+    lead: 'Write one fun fact about the historical origin, cultural background, or traditional culinary use of the vegetable "%V%".',
+    focus: "Focus on its history and origin.",
+    temperature: 0.6,
+    top_p: 0.9,
   },
   casual: {
     label: "Santai",
-    instruction: "Friendly and conversational.",
+    lead: 'Write one relaxed, friendly, and conversational fun fact about the vegetable "%V%".',
+    focus: "Write it like you are casually chatting with a friend.",
+    temperature: 0.85,
+    top_p: 0.95,
   },
 };
 

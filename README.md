@@ -36,13 +36,12 @@ src/scripts/
   bobot, dan urutan label **tidak diubah**.
 - **GenAI**: `dtype: "q4"` (fallback q8). Output bahasa Inggris (model
   LaMini-Flan-T5 paling akurat di Inggris; Indonesia opsional pada rubrik).
-  Generasi **dua tahap** demi akurasi & konsistensi antar persona:
-  1. **Fakta dasar** — `temperature 0.3`, faktual, di-cache per sesi deteksi.
-  2. **Restyle** — menulis ulang fakta dasar sesuai persona tanpa mengubah
-     faktanya (`temperature 0.7`). Ganti persona hanya menjalankan tahap 2.
-
-  Semua tahap: `do_sample: true`, `top_p: 0.9`, `no_repeat_ngram_size: 3`,
-  `repetition_penalty: 1.4`, `max_new_tokens ≤ 150`.
+  Fun fact **dibuat langsung per persona**: setiap persona punya prompt gaya
+  yang tegas + `temperature`/`top_p` sendiri (Lucu lebih kreatif 0.95,
+  Profesional lebih terkendali 0.3) sehingga gaya tiap persona jelas berbeda —
+  seluruhnya dari model, bukan teks statis. Hasil di-cache per `sayuran|persona`
+  dalam satu sesi. Parameter umum: `do_sample: true`, `no_repeat_ngram_size: 3`,
+  `repetition_penalty: 1.4`, `max_new_tokens: 100` (≤150).
 
 - **Deteksi**: hanya area **kotak hijau** yang diklasifikasi (crop `inset 18%`).
   Kamera **auto-stop** hanya bila objek terdeteksi yakin (≥90% + margin ≥25%)
