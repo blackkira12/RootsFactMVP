@@ -1,9 +1,5 @@
 import { APP_CONFIG, CAMERA_CONFIG } from "../../config.js";
-import {
-  isValidDetection,
-  getCameraErrorMessage,
-  logError,
-} from "../../utils/index.js";
+import { getCameraErrorMessage, logError } from "../../utils/index.js";
 
 /**
  * HomePresenter — lapisan Presenter (MVP).
@@ -26,13 +22,8 @@ export default class HomePresenter {
   #stableLabel = null;
   #stableCount = 0;
   #confidentSince = 0; // timestamp mulai streak yakin (untuk dwell berbasis waktu)
+  #scanStartTime = 0; // timestamp mulai sesi scan (untuk jaring pengaman ambang)
   #generatedLabel = null;
-
-  // Penghalusan tampilan confidence (EMA) + pembatasan frekuensi update UI
-  // agar angka tidak melonjak-lonjak setiap frame.
-  #displayConfidence = 0;
-  #lastDisplayLabel = null;
-  #lastUiUpdate = 0;
 
   constructor({ view, cameraService, detectionService, rootFactsService }) {
     this.#view = view;
@@ -141,6 +132,7 @@ export default class HomePresenter {
     this.#view.showState("loading");
 
     this.#lastFrameTime = 0;
+    this.#scanStartTime = performance.now();
     this.#rafId = requestAnimationFrame((t) => this.#detectionLoop(t));
   }
 
@@ -154,9 +146,9 @@ export default class HomePresenter {
     this.#view.setScanning(false);
     this.#view.setStatus("Siap", { active: false });
 
-    // Seperti aplikasi referensi: hasil deteksi terakhir tetap ditampilkan
-    // setelah kamera dihentikan; kembali ke idle hanya bila belum ada hasil.
-    if (this.#generatedLabel || this.#stableLabel) {
+    // Tampilkan kartu hasil hanya bila sudah ada sayuran yang benar-benar
+    // terkunci (fun fact dibuat). Berhenti manual tanpa deteksi → kembali idle.
+    if (this.#generatedLabel) {
       this.#view.showState("result");
     } else {
       this.#view.showState("idle");
@@ -198,34 +190,37 @@ export default class HomePresenter {
   #handleDetection(result) {
     const now = performance.now();
 
-    // 1) Tampilan live: selalu tunjukkan tebakan teratas saat memindai, dengan
-    //    confidence dihaluskan (EMA) dan diperbarui maks ~4x/detik agar angka
-    //    tidak berkedip mengikuti setiap frame.
-    if (result.label === this.#lastDisplayLabel) {
-      this.#displayConfidence =
-        this.#displayConfidence * 0.7 + result.confidence * 0.3;
-    } else {
-      this.#lastDisplayLabel = result.label;
-      this.#displayConfidence = result.confidence;
+    // Selama memindai UI tetap pada state "Mencari..." — kartu hasil baru
+    // ditampilkan setelah sayuran benar-benar terkunci (kamera berhenti).
+
+    const elapsed = now - this.#scanStartTime;
+
+    // Timeout keras: bila tak ada sayuran yang terdeteksi sama sekali, hentikan
+    // kamera agar tidak memindai selamanya.
+    if (elapsed >= APP_CONFIG.detectionScanTimeoutMs) {
+      this.#stopScan();
+      this.#view.showCameraError(
+        "Sayuran tidak terdeteksi. Arahkan sayuran lebih jelas ke dalam kotak, lalu coba lagi.",
+      );
+      return;
     }
 
-    if (now - this.#lastUiUpdate >= 250) {
-      this.#lastUiUpdate = now;
-      this.#view.showState("result");
-      this.#view.renderDetection({
-        ...result,
-        confidence: this.#displayConfidence,
-      });
-    }
+    // Ambang efektif: utama 80%. Jaring pengaman — bila setelah beberapa detik
+    // belum ada yang tembus 80%, longgarkan agar kamera dijamin berhenti begitu
+    // objek dikenali (mencegah pemindaian & klasifikasi tanpa henti).
+    const threshold =
+      elapsed >= APP_CONFIG.detectionFallbackAfterMs
+        ? APP_CONFIG.detectionFallbackThreshold
+        : APP_CONFIG.detectionConfidenceThreshold;
 
-    // 2) Streak "objek pasti": confidence tinggi (>= threshold) DAN margin
-    //    jelas dari kandidat kedua. Hanya frame yang benar-benar yakin dihitung.
+    // Frame dianggap "yakin" bila confidence >= ambang DAN unggul jelas dari
+    // kandidat kedua (margin).
     const isConfident =
-      isValidDetection(result) &&
+      result.confidence >= threshold &&
       result.margin >= APP_CONFIG.detectionConfidenceMargin;
 
     if (!isConfident) {
-      // Belum yakin — reset streak, jangan matikan kamera.
+      // Belum yakin — reset streak, teruskan memindai.
       this.#stableLabel = null;
       this.#stableCount = 0;
       this.#confidentSince = 0;
@@ -241,9 +236,8 @@ export default class HomePresenter {
       this.#confidentSince = now;
     }
 
-    // 3) Auto-stop sekali jepret: kamera mati HANYA setelah objek terdeteksi
-    //    yakin & stabil selama durasi dwell (~2 detik), dengan gerbang minimal
-    //    frame anti-fluke. Lalu hasil final dibekukan dan fun fact dibuat.
+    // Auto-stop: kamera mati setelah objek yakin & stabil selama durasi dwell
+    // (~1,5 detik) + gerbang minimal frame. Lalu hasil dibekukan & fakta dibuat.
     const heldLongEnough =
       now - this.#confidentSince >= APP_CONFIG.detectionHoldMs;
     const enoughFrames =
@@ -251,9 +245,8 @@ export default class HomePresenter {
 
     if (heldLongEnough && enoughFrames) {
       this.#generatedLabel = this.#stableLabel;
-      this.#view.showState("result");
+      this.#stopScan(); // hentikan kamera segera + tampilkan kartu hasil
       this.#view.renderDetection(result);
-      this.#stopScan();
       this.#view.setStatus("Sayuran terdeteksi", { active: true });
       this.#generateFacts(this.#stableLabel);
     }
@@ -348,10 +341,8 @@ export default class HomePresenter {
     this.#stableLabel = null;
     this.#stableCount = 0;
     this.#confidentSince = 0;
+    this.#scanStartTime = 0;
     this.#generatedLabel = null;
-    this.#displayConfidence = 0;
-    this.#lastDisplayLabel = null;
-    this.#lastUiUpdate = 0;
   }
 
   destroy() {

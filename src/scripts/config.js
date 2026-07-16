@@ -1,18 +1,25 @@
 const APP_CONFIG = {
-  // Threshold ketat: objek baru dianggap "pasti" bila confidence >= 90%.
-  detectionConfidenceThreshold: 90,
+  // Ambang utama: sayuran dianggap terdeteksi bila confidence >= 80%.
+  detectionConfidenceThreshold: 80,
   analyzingDelay: 2000,
   factsGenerationDelay: 2000,
   detectionRetryInterval: 100,
-  // Objek harus terdeteksi yakin & stabil (label sama) selama durasi ini
-  // sebelum kamera auto-stop. Basis WAKTU, bukan jumlah frame, agar tidak
-  // "langsung mati" (5 frame @30fps hanya ~0,17 detik).
-  detectionHoldMs: 2000,
+  // Objek harus terdeteksi yakin & stabil (label sama) selama ~1,5 detik
+  // sebelum kamera auto-stop — cukup mantap, tetap segera berhenti.
+  detectionHoldMs: 1500,
   // Minimal frame berturut-turut sebagai gerbang tambahan (anti-fluke).
   detectionStabilityCount: 3,
-  // Selisih minimum antara kandidat teratas dan kedua (%). Memastikan model
-  // benar-benar yakin pada satu objek, bukan menebak di antara dua yang mirip.
-  detectionConfidenceMargin: 25,
+  // Selisih minimum antara kandidat teratas dan kedua (%) — memastikan model
+  // condong ke satu objek, bukan ragu di antara dua yang mirip.
+  detectionConfidenceMargin: 10,
+  // Jaring pengaman: bila setelah durasi ini belum ada objek yang tembus 80%,
+  // ambang dilonggarkan ke nilai fallback agar kamera DIJAMIN berhenti begitu
+  // objek dikenali (mencegah kamera memindai tanpa henti).
+  detectionFallbackAfterMs: 4000,
+  detectionFallbackThreshold: 60,
+  // Timeout keras: bila hingga durasi ini tidak ada sayuran yang terdeteksi
+  // sama sekali, kamera dihentikan dengan pesan agar tidak memindai selamanya.
+  detectionScanTimeoutMs: 15000,
 };
 
 const UI_CONFIG = {
