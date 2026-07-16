@@ -4,9 +4,9 @@ const APP_CONFIG = {
   analyzingDelay: 2000,
   factsGenerationDelay: 2000,
   detectionRetryInterval: 100,
-  // Objek harus terdeteksi yakin & stabil (label sama) selama ~1,5 detik
-  // sebelum kamera auto-stop — cukup mantap, tetap segera berhenti.
-  detectionHoldMs: 1500,
+  // Objek harus terdeteksi yakin & stabil (label sama) selama ~1 detik
+  // sebelum kamera auto-stop — cepat tapi tetap tidak salah picu sekejap.
+  detectionHoldMs: 1000,
   // Minimal frame berturut-turut sebagai gerbang tambahan (anti-fluke).
   detectionStabilityCount: 3,
   // Selisih minimum antara kandidat teratas dan kedua (%) — memastikan model
@@ -14,8 +14,8 @@ const APP_CONFIG = {
   detectionConfidenceMargin: 10,
   // Jaring pengaman: bila setelah durasi ini belum ada objek yang tembus 80%,
   // ambang dilonggarkan ke nilai fallback agar kamera DIJAMIN berhenti begitu
-  // objek dikenali (mencegah kamera memindai tanpa henti).
-  detectionFallbackAfterMs: 4000,
+  // objek dikenali (objek marginal terkunci ~2,5 detik, bukan memindai lama).
+  detectionFallbackAfterMs: 1500,
   detectionFallbackThreshold: 60,
   // Timeout keras: bila hingga durasi ini tidak ada sayuran yang terdeteksi
   // sama sekali, kamera dihentikan dengan pesan agar tidak memindai selamanya.

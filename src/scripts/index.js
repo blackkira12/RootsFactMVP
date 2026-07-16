@@ -22,9 +22,23 @@ function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   if (process.env.NODE_ENV !== "production") return;
 
+  // Bila halaman sudah dikontrol SW lama, muat ulang sekali saat SW baru
+  // mengambil alih (deploy baru) agar pengguna selalu memakai versi terbaru
+  // dan tidak melihat UI usang dari cache.
+  if (navigator.serviceWorker.controller) {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+  }
+
   const register = async () => {
     try {
-      await navigator.serviceWorker.register("./sw.js");
+      const registration = await navigator.serviceWorker.register("./sw.js");
+      // Paksa cek update setiap kunjungan agar bundle baru cepat terpasang.
+      registration.update?.();
     } catch (error) {
       console.error("Gagal registrasi service worker:", error);
     }
