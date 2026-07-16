@@ -719,4 +719,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+
+  /* Spinner loading adalah indikator progres fungsional (bukan dekorasi),
+     jadi tetap berputar meski mode "Reduce Motion" aktif. */
+  .loading-ring,
+  .fun-fact-loading-spinner {
+    animation-duration: 0.8s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
